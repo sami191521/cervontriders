@@ -174,6 +174,12 @@
   .stat .v small{font-family:'Barlow';font-size:11px;opacity:.6;font-weight:400}
 
   .editsec{padding:11px 15px 15px;margin-top:8px;border-top:1px dashed rgba(255,255,255,.12)}
+  /* Live mode: only an authenticated admin can edit rider profiles (nickname/quote/photo). */
+  body.tob-live:not(.tob-admin) .editsec{display:none}
+  /* Admin-account form (change username/password) — only meaningful in live mode. */
+  body:not(.tob-live) .live-only{display:none}
+  .acctform input{width:100%;font-family:'Barlow';font-size:13px;background:rgba(255,255,255,.05);color:var(--cream);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:9px 11px;margin-bottom:8px}
+  .acctform input:focus{outline:none;border-color:var(--jersey)}
   .editsec input,.editsec textarea{width:100%;font-family:'Barlow';font-size:13px;background:rgba(255,255,255,.05);color:var(--cream);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:7px 9px;margin-bottom:7px;resize:vertical}
   .editsec textarea{min-height:46px}
   .editrow{display:flex;gap:7px}
@@ -338,7 +344,10 @@
 <body>
 <div class="app">
   <header>
-    <button class="admin-corner" id="adminCorner">🔒 Admin</button>
+    <div style="position:absolute;top:12px;right:18px;z-index:6;display:flex;gap:8px">
+      <button class="admin-corner" id="acctCorner" style="position:static;display:none">🔑 Admin Account</button>
+      <button class="admin-corner" id="adminCorner" style="position:static">🔒 Admin</button>
+    </div>
     <h1>🇧🇿 The Great Caye Talkers Tour of Belize</h1>
     <div class="subtitle">Punta Gorda <span class="arrow">→</span> Corozal &nbsp;•&nbsp; Four Weeks &nbsp;•&nbsp; One Country &nbsp;•&nbsp; One Champion 🚴🏆</div>
     <div class="viewnav">
@@ -554,6 +563,21 @@
     </div>
   </div>
 </div>
+<div class="login-overlay" id="acctOverlay">
+  <div class="login-card">
+    <div class="login-title">🔑 Admin Account</div>
+    <input type="text" id="acctCurUser" placeholder="Current username" autocomplete="off" />
+    <input type="password" id="acctCurrent" placeholder="Current password" autocomplete="off" />
+    <input type="text" id="acctUser" placeholder="New username" autocomplete="off" />
+    <input type="password" id="acctPass" placeholder="New password" autocomplete="off" />
+    <input type="password" id="acctPass2" placeholder="Confirm new password" autocomplete="off" />
+    <div class="login-err" id="acctStatus"></div>
+    <div class="login-btns">
+      <button class="btn-sm ghost" id="acctCancel">Cancel</button>
+      <button class="btn-sm" id="acctSave">Change password</button>
+    </div>
+  </div>
+</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -753,7 +777,11 @@ function cardHTML(a){
   const gapTxt=ahead?`· ${gap===0?'tied with':gap+' behind'} ${ahead.n.split(' ')[0]}`:'· 🟡 race leader';
   const rem=rv%5, toNext=rv>=100?0:(rem===0?5:5-rem);
   const nextTxt=rv>=100?'🏁 finished the course':`${toNext} to clear ${MILES[Math.min(cps+1,20)]}`;
-  const pace=a.r>=5?'<span class="pacebadge">🔥 5+/day</span>':'';
+  // Real consistency streak (consecutive days with +5 sales) when available;
+  // fall back to the 5+/day-pace stand-in only offline (no streak data).
+  const pace=a.streak>0
+    ? `<span class="pacebadge" title="${a.streak} days in a row with 5+ sales">🔥 ${a.streak}-day streak</span>`
+    : (a.streak==null && a.r>=5 ? '<span class="pacebadge">🔥 5+/day</span>' : '');
   const mix=[['MVA',a.mva],['WC',a.wc],['PI',a.pi],['Oth',a.oth]].filter(x=>x[1]!=null&&x[1]>0);
   const mixLine=mix.length?`<div class="mixline">${mix.map(x=>`${x[0]} <b>${x[1]}</b>`).join(' · ')}</div>`:'';
   return `<div class="rcard ${a.rank===1?'lead':''}" style="--team:${tc}" data-id="${a.id}">
@@ -855,8 +883,21 @@ function handlePhoto(id,file){
       const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
       const cv=document.createElement('canvas');cv.width=w;cv.height=h;
       cv.getContext('2d').drawImage(img,0,0,w,h);
-      getP(id).photo=cv.toDataURL('image/jpeg',0.72);
-      saveP(id);renderGrid();
+      const finish=durl=>{getP(id).photo=durl;saveP(id);renderGrid();};
+      // Live: upload the resized image to storage and save its URL (shared).
+      // Offline: keep the on-device data-URL.
+      if(window.TOB_API && cv.toBlob){
+        cv.toBlob(b=>{
+          const fd=new FormData(); fd.append('file', b, 'photo.jpg');
+          const tk=sessionStorage.getItem('tob_token')||'';
+          fetch(window.TOB_API+'/api/upload/photo',{method:'POST',headers:tk?{'Authorization':'Bearer '+tk}:{},body:fd})
+            .then(r=>r.ok?r.json():Promise.reject())
+            .then(j=>finish(j.url))
+            .catch(()=>finish(cv.toDataURL('image/jpeg',0.72)));
+        },'image/jpeg',0.72);
+      } else {
+        finish(cv.toDataURL('image/jpeg',0.72));
+      }
     };
     img.src=ev.target.result;
   };
@@ -956,7 +997,7 @@ function renderLeaderboard(){
       const tc=teamColor(a.tl);
       const gc=lbScope!=='all'?`<span class="gctag">GC #${a.rank}</span>`:'';
       const jb=(yellow&&a.id===yellow.id?'🟡':'')+(green&&a.id===green.id?'🟢':'')+(polka&&a.id===polka.id?'🔴':'')+(white&&a.id===white.id?'⚪':'')+(cleanRider&&a.id===cleanRider.id?'✨':'');
-      const pace=a.r>=5?'🔥':'';
+      const pace=a.streak>0?('🔥'+a.streak):(a.streak==null&&a.r>=5?'🔥':'');
       return `<div class="lbrow"><span class="c-pos ${med}">${i+1}</span>`+
         `<span class="c-name"><b>${a.n}</b> ${mv} ${jb} ${gc}</span>`+
         `<span class="c-team"><span class="tdot" style="background:${tc}"></span>${a.tl}</span>`+
@@ -999,10 +1040,20 @@ renderTop10();
 function cavatar(a,p,cls){return p.photo?`<div class="${cls}"><img src="${p.photo}" alt=""></div>`:`<div class="${cls}">${initials(a.n)}</div>`;}
 function renderCeremony(){
   const wrap=document.getElementById('podium'); if(!wrap) return;
-  const top5=byLeads.slice(0,5);
+  // Weekly stage winners when this week's scores exist; else fall back to the
+  // overall GC podium (e.g. offline, or before a Monday baseline is set).
+  const stage=AGENTS.some(a=>(a.week||0)>0);
+  const ranked=stage
+    ? [...AGENTS].sort((a,b)=>(b.week||0)-(a.week||0)||raceVal(b)-raceVal(a)||a.n.localeCompare(b.n))
+    : byLeads;
+  const valOf=stage?(a=>a.week||0):(a=>raceVal(a));
+  const unit=stage?'this week':raceUnit();
+  const sub=document.querySelector('.cer-head p');
+  if(sub)sub.textContent=stage?'This week’s stage · Top 3 win the stage':'Crowning the Top 5 of the Tour';
+  const top5=ranked.slice(0,5);
   const rings={0:'#f4c430',1:'#cdd3da',2:'#c98a4b'};
   const cls={0:'first',1:'second',2:'third'};
-  const amts={0:'$150 · Champion',1:'$75',2:'$50'};
+  const amts=stage?{0:'$75',1:'$50',2:'$25'}:{0:'$150 · Champion',1:'$75',2:'$50'};
   const order=[1,0,2]; // 2nd, 1st, 3rd on the podium
   wrap.innerHTML=order.map(idx=>{
     const a=top5[idx]; if(!a) return '';
@@ -1012,7 +1063,7 @@ function renderCeremony(){
       ${cavatar(a,p,'pavatar')}
       <div class="pname">${a.n}</div>
       <div class="pnick">${p.nickname?('“'+p.nickname+'”'):''}</div>
-      <div class="psales">${raceVal(a)}</div><div class="psub">${raceUnit()}</div>
+      <div class="psales">${valOf(a)}</div><div class="psub">${unit}</div>
       <div class="block"><div class="rk">${idx+1}</div><div class="amt">${amts[idx]}</div></div>
     </div>`;
   }).join('');
@@ -1020,7 +1071,8 @@ function renderCeremony(){
   run.innerHTML=[3,4].map(idx=>{
     const a=top5[idx]; if(!a) return '';
     const p=getP(a.id); const cp=Math.min(Math.floor(a.ld/5),20);
-    return `<div class="rcard2" style="--ring:#4a6fa5"><span class="rpos">${idx+1}</span>${cavatar(a,p,'ravatar')}<div class="rinfo"><div class="rn">${a.n}</div><div class="rs">${a.ld} sales · ${cp} checkpoints</div></div></div>`;
+    const rs=stage?`${valOf(a)} this week · ${a.ld} total`:`${a.ld} sales · ${cp} checkpoints`;
+    return `<div class="rcard2" style="--ring:#4a6fa5"><span class="rpos">${idx+1}</span>${cavatar(a,p,'ravatar')}<div class="rinfo"><div class="rn">${a.n}</div><div class="rs">${rs}</div></div></div>`;
   }).join('');
 }
 let confettiRAF=null;
@@ -1448,7 +1500,22 @@ document.querySelectorAll('.vidset').forEach(box=>{
   const k=box.dataset.key;
   const urlIn=box.querySelector('.vid-url'), fileIn=box.querySelector('.vid-file'), note=box.querySelector('.vid-note');
   urlIn.addEventListener('input',()=>{videos[k]=urlIn.value.trim();persistVideos();refreshVideoButtons();if(k==='intro'){introSeen=false;if(hasStore){try{window.storage.set('introseen','',false);}catch(e){}}}});
-  fileIn.addEventListener('change',()=>{const f=fileIn.files[0];if(!f)return;if(videoBlobs[k])URL.revokeObjectURL(videoBlobs[k]);videoBlobs[k]=URL.createObjectURL(f);note.textContent='Loaded for this session';refreshVideoButtons();if(k==='intro')introSeen=false;});
+  fileIn.addEventListener('change',()=>{
+    const f=fileIn.files[0];if(!f)return;
+    if(window.TOB_API){
+      // Live: upload to storage and save the shared URL (replaces the URL box).
+      note.textContent='Uploading…';
+      const fd=new FormData(); fd.append('file', f, f.name||'video');
+      const tk=sessionStorage.getItem('tob_token')||'';
+      fetch(window.TOB_API+'/api/upload/video',{method:'POST',headers:tk?{'Authorization':'Bearer '+tk}:{},body:fd})
+        .then(r=>r.ok?r.json():Promise.reject(r.status))
+        .then(j=>{videos[k]=j.url; urlIn.value=j.url; persistVideos(); note.textContent='Uploaded & saved'; refreshVideoButtons(); if(k==='intro')introSeen=false;})
+        .catch(s=>{note.textContent=(s===401?'Admin login required':'Upload failed');});
+    } else {
+      // Offline: session-only object URL (too big to save on-device).
+      if(videoBlobs[k])URL.revokeObjectURL(videoBlobs[k]);videoBlobs[k]=URL.createObjectURL(f);note.textContent='Loaded for this session';refreshVideoButtons();if(k==='intro')introSeen=false;
+    }
+  });
   box.querySelector('.vid-test').addEventListener('click',()=>{if(!playMoment(k))note.textContent='Add a link or file first.';});
 });
 /* board triggers */

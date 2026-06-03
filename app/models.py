@@ -104,6 +104,14 @@ class ConfigUpdate(BaseModel):
     videos: Optional[Videos] = None
 
 
+class CredentialUpdate(BaseModel):
+    """Admin changes their own username/password (handoff: real auth server-side)."""
+    currentUser: Optional[str] = None
+    currentPass: str
+    newUser: Optional[str] = None
+    newPass: Optional[str] = None
+
+
 class Profile(BaseModel):
     """Per-rider editable bits, keyed by rider id (handoff §9)."""
     model_config = ConfigDict(extra="ignore")
@@ -120,6 +128,10 @@ class StandingsResponse(BaseModel):
     riders: list[Rider] = Field(default_factory=list)
     teams: list[TeamStanding] = Field(default_factory=list)
     jerseys: Jerseys = Field(default_factory=Jerseys)
+    # weekly stage standings: riders with this week's score (cumulative - Monday
+    # baseline), ranked by `week` desc. Top 3 win the stage prizes (§8).
+    stageWinners: list[Rider] = Field(default_factory=list)
+    weekStart: Optional[str] = None          # ISO Monday date the stage began
 
 
 class IngestSummary(BaseModel):

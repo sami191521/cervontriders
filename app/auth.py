@@ -55,9 +55,40 @@ def verify_token(token: str) -> bool:
 
 
 def check_credentials(user: str, password: str) -> bool:
+    """Env bootstrap credentials (used until the admin sets their own)."""
     return (
         hmac.compare_digest(user or "", ADMIN_USER)
         and hmac.compare_digest(password or "", ADMIN_PASS)
+    )
+
+
+# ---- stored (DB) credentials: salted PBKDF2 hash, never plaintext ----------
+_PBKDF2_ROUNDS = 200_000
+
+
+def hash_password(password: str) -> str:
+    """Return 'salt$hash' for storage."""
+    salt = secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac("sha256", (password or "").encode(),
+                            bytes.fromhex(salt), _PBKDF2_ROUNDS).hex()
+    return f"{salt}${h}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        salt, h = (stored or "").split("$", 1)
+        calc = hashlib.pbkdf2_hmac("sha256", (password or "").encode(),
+                                   bytes.fromhex(salt), _PBKDF2_ROUNDS).hex()
+    except (ValueError, AttributeError):
+        return False
+    return hmac.compare_digest(calc, h)
+
+
+def verify_stored(user: str, password: str, creds: dict) -> bool:
+    """Check a login against DB-stored credentials {user, hash}."""
+    return (
+        hmac.compare_digest(user or "", creds.get("user", ""))
+        and verify_password(password, creds.get("hash", ""))
     )
 
 

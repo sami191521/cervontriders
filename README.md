@@ -36,6 +36,7 @@ offline (per-device), unchanged.
 | Method | Path | Auth | |
 |---|---|---|---|
 | POST | `/api/auth/login` | — | `{user,pass}` → `{token}` |
+| PUT | `/api/admin/credentials` | admin | `{currentPass, newUser?, newPass?}` → admin changes own login |
 | POST | `/api/ingest` | admin | upload `.xlsx`/`.csv` (server parses + maps) |
 | POST | `/api/ingest/preview` | admin | parse only: headers + auto-mapping + sample |
 | POST | `/api/ingest/json` | admin | `{riders:[…]}` already-normalized (wired UI posts these) |
@@ -66,3 +67,9 @@ static/
   second — it diffs against the previous upload's snapshot.
 - The weekly stage resets each Monday: score = cumulative − Monday baseline.
 - `null` fields mean "column absent in this upload" — the UI hides that stat.
+- **Admin credentials:** `TOB_ADMIN_USER`/`TOB_ADMIN_PASS` are only the *bootstrap*
+  login. Once the admin changes them via `PUT /api/admin/credentials`, the new
+  username + a salted PBKDF2 hash are stored in the DB (kv key `admin_creds`) and
+  the env values stop being used. **Lockout recovery:** delete the `admin_creds`
+  row (Supabase SQL editor: `delete from kv where key='admin_creds';`) to fall
+  back to the env credentials.

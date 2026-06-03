@@ -21,6 +21,14 @@
   var didFilters = false;
 
   function token() { return sessionStorage.getItem("tob_token") || ""; }
+  // body classes gate the profile-edit UI: live + admin -> editable, else hidden
+  function reflectAdmin() {
+    document.body.classList.add("tob-live");
+    var on = !!token();
+    document.body.classList.toggle("tob-admin", on);
+    var acct = document.getElementById("acctCorner");   // show Account btn only when logged in
+    if (acct) acct.style.display = on ? "" : "none";
+  }
   function authHeaders() {
     var h = { "Content-Type": "application/json" };
     if (token()) h["Authorization"] = "Bearer " + token();
@@ -143,6 +151,7 @@
       var d = await r.json();
       sessionStorage.setItem("tob_token", d.token);
       window.adminUnlocked = true;
+      reflectAdmin();   // reveal the profile-edit UI now that we're authenticated
       document.getElementById("adminLogin").classList.remove("show");
       var corner = document.getElementById("adminCorner");
       if (corner) corner.textContent = "⚙ Admin";
@@ -166,9 +175,65 @@
     }
   }
 
+  /* ---------- admin account modal (Account button → change username/password) ---------- */
+  function clearAccount() {
+    ["acctCurUser", "acctCurrent", "acctUser", "acctPass", "acctPass2"].forEach(id => {
+      var e = document.getElementById(id); if (e) e.value = "";
+    });
+    var s = document.getElementById("acctStatus"); if (s) { s.textContent = ""; s.style.color = ""; }
+  }
+  function openAccount() {
+    clearAccount();
+    var o = document.getElementById("acctOverlay"); if (o) o.classList.add("show");
+    var f = document.getElementById("acctCurUser"); if (f) f.focus();
+  }
+  function closeAccount() {
+    var o = document.getElementById("acctOverlay"); if (o) o.classList.remove("show");
+  }
+  function bindAccount() {
+    var corner = document.getElementById("acctCorner");
+    if (corner) corner.addEventListener("click", openAccount);
+    var cancel = document.getElementById("acctCancel");
+    if (cancel) cancel.addEventListener("click", closeAccount);
+    var overlay = document.getElementById("acctOverlay");
+    if (overlay) overlay.addEventListener("click", e => { if (e.target === overlay) closeAccount(); });
+
+    var btn = document.getElementById("acctSave");
+    if (!btn) return;
+    var val = id => (document.getElementById(id) || {}).value || "";
+    var setStatus = (msg, ok) => {
+      var s = document.getElementById("acctStatus");
+      if (s) { s.textContent = msg; s.style.color = ok ? "#5fd0bf" : "#ff7a86"; }
+    };
+    btn.addEventListener("click", async function () {
+      var cu = val("acctCurUser").trim(), cur = val("acctCurrent");
+      var nu = val("acctUser").trim(), np = val("acctPass"), np2 = val("acctPass2");
+      if (!cu) return setStatus("Enter your current username.");
+      if (!cur) return setStatus("Enter your current password.");
+      if (!nu && !np) return setStatus("Enter a new username and/or password.");
+      if (np && np !== np2) return setStatus("New passwords do not match.");
+      if (np && np.length < 6) return setStatus("New password must be at least 6 characters.");
+      var body = { currentUser: cu, currentPass: cur };
+      if (nu) body.newUser = nu;
+      if (np) body.newPass = np;
+      try {
+        var r = await fetch(API + "/api/admin/credentials",
+          { method: "PUT", headers: authHeaders(), body: JSON.stringify(body) });
+        var j = await r.json().catch(() => ({}));
+        if (!r.ok) return setStatus(j.detail || "Update failed.");
+        sessionStorage.setItem("tob_token", j.token);   // stay logged in under new creds
+        reflectAdmin();
+        setStatus("Updated! Your new login is active.", true);
+        setTimeout(closeAccount, 1100);
+      } catch (e) { setStatus("Network error — is the server reachable?"); }
+    });
+  }
+
   /* ---------- boot ---------- */
   async function boot() {
+    reflectAdmin();
     rebindLogin();
+    bindAccount();
     await loadConfigAndProfiles();
     await loadStandings();
     setInterval(loadStandings, POLL_MS);

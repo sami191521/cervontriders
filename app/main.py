@@ -12,9 +12,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import constants, ingest as ig, standings as st, db, auth
+from . import constants, ingest as ig, standings as st, auth, media
+# storage backend: Supabase when configured, else local SQLite (dev)
+if os.environ.get("SUPABASE_URL"):
+    from . import db_supabase as db
+else:
+    from . import db
 from .models import (
-    Config, ConfigUpdate, Profile, StandingsResponse, IngestSummary, RaceMetric,
+    Config, ConfigUpdate, CredentialUpdate, Profile, StandingsResponse,
+    IngestSummary, RaceMetric,
 )
 
 # paths for serving the wired reference UI + adapter
@@ -26,6 +32,10 @@ _HTML_PATH = os.path.join(_HERE, "..", "static", "caye-talkers-tour-of-belize.ht
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
+    try:
+        media.ensure_bucket()
+    except Exception as e:  # storage is optional; don't block startup
+        print("[media] bucket setup skipped:", e)
     yield
 
 
@@ -61,9 +71,14 @@ def build_standings(metric: Optional[str] = None, scope: str = "all") -> Standin
     riders = res["riders"]
     if scope != "all":
         riders = [r for r in riders if r.tl == scope]   # keep GC ranks within group
+    # weekly stage standings: riders ranked by this week's score (§8). Empty
+    # until a Monday baseline exists, which tells the UI to fall back to GC.
+    stage = sorted([r for r in riders if r.week > 0],
+                   key=lambda r: (-r.week, -r.r, r.n))
     return StandingsResponse(
         lastUpdated=cfg.lastUpdated, raceMetric=metric, scope=scope,
         riders=riders, teams=res["teams"], jerseys=res["jerseys"],
+        stageWinners=stage, weekStart=db.kv_get("week_start"),
     )
 
 
@@ -79,11 +94,52 @@ def route():
 
 
 # ---------- auth -------------------------------------------------------------
+def _current_admin_user() -> str:
+    creds = db.kv_get("admin_creds")
+    return creds["user"] if creds else auth.ADMIN_USER
+
+
+def _verify_login(user: str, password: str) -> bool:
+    """DB-stored credentials if the admin has set them, else env bootstrap."""
+    creds = db.kv_get("admin_creds")
+    if creds:
+        return auth.verify_stored(user, password, creds)
+    return auth.check_credentials(user, password)
+
+
 @app.post("/api/auth/login")
 def login(body: dict = Body(...)):
-    if not auth.check_credentials(body.get("user", ""), body.get("pass", "")):
+    if not _verify_login(body.get("user", ""), body.get("pass", "")):
         raise HTTPException(status_code=401, detail="Incorrect username or password.")
     return {"token": auth.make_token(body.get("user", "admin"))}
+
+
+@app.put("/api/admin/credentials")
+def change_credentials(body: CredentialUpdate, _: bool = Depends(auth.require_admin)):
+    """Admin changes their own username and/or password (requires current password)."""
+    # verify against the typed current username + password (falls back to the
+    # stored username if the client didn't send one)
+    cur_user = (body.currentUser or "").strip() or _current_admin_user()
+    if not _verify_login(cur_user, body.currentPass):
+        raise HTTPException(status_code=403, detail="Current username or password is incorrect.")
+    if not body.newUser and not body.newPass:
+        raise HTTPException(status_code=400, detail="Provide newUser and/or newPass.")
+    if body.newPass is not None and len(body.newPass) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters.")
+    if body.newUser is not None and not body.newUser.strip():
+        raise HTTPException(status_code=400, detail="New username cannot be empty.")
+
+    creds = db.kv_get("admin_creds")
+    new_user = (body.newUser or cur_user).strip()
+    if body.newPass:
+        new_hash = auth.hash_password(body.newPass)
+    elif creds:
+        new_hash = creds["hash"]                 # username-only change
+    else:
+        new_hash = auth.hash_password(body.currentPass)  # migrate env creds into DB
+    db.kv_set("admin_creds", {"user": new_user, "hash": new_hash})
+    # re-issue a token so the client stays logged in under the (possibly) new name
+    return {"ok": True, "user": new_user, "token": auth.make_token(new_user)}
 
 
 # ---------- ingest -----------------------------------------------------------
@@ -175,6 +231,29 @@ def put_config(update: ConfigUpdate, _: bool = Depends(auth.require_admin)):
     return new_cfg
 
 
+# ---------- media uploads (handoff §9) --------------------------------------
+@app.post("/api/upload/photo")
+async def upload_photo(file: UploadFile = File(...), _: bool = Depends(auth.require_admin)):
+    """Upload a rider photo, return its shareable URL (admin — part of profiles)."""
+    data = await file.read()
+    if len(data) > 5_000_000:
+        raise HTTPException(status_code=413, detail="Photo too large (max 5 MB).")
+    url = media.upload("photos", file.filename or "photo.jpg", data,
+                       file.content_type or "image/jpeg")
+    return {"url": url}
+
+
+@app.post("/api/upload/video")
+async def upload_video(file: UploadFile = File(...), _: bool = Depends(auth.require_admin)):
+    """Upload a moment video (admin), return its shareable URL."""
+    data = await file.read()
+    if len(data) > 50_000_000:
+        raise HTTPException(status_code=413, detail="Video too large (max 50 MB).")
+    url = media.upload("videos", file.filename or "video.mp4", data,
+                       file.content_type or "video/mp4")
+    return {"url": url}
+
+
 # ---------- profiles ---------------------------------------------------------
 @app.get("/api/profiles")
 def get_profiles():
@@ -188,7 +267,8 @@ def get_profile(rider_id: str):
 
 
 @app.put("/api/riders/{rider_id}/profile", response_model=Profile)
-def put_profile(rider_id: str, profile: Profile):
+def put_profile(rider_id: str, profile: Profile, _: bool = Depends(auth.require_admin)):
+    """Set a rider's nickname/quote/photo (admin only — shared across devices)."""
     db.save_profile(rider_id, profile.model_dump())
     return profile
 
@@ -203,3 +283,9 @@ def index():
 def adapter_js():
     return FileResponse(os.path.join(_STATIC_DIR, "api-adapter.js"),
                         media_type="application/javascript")
+
+
+@app.get("/uploads/{name}")
+def uploaded(name: str):
+    """Serve locally-stored uploads (used only when Supabase Storage is off)."""
+    return FileResponse(os.path.join(_STATIC_DIR, "uploads", os.path.basename(name)))
