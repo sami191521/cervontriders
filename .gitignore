@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+tob.sqlite3
+tob.sqlite3-wal
+tob.sqlite3-shm
