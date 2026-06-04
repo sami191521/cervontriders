@@ -420,7 +420,7 @@
           </div>
           <div class="card">
             <h3 style="color:var(--cream)">⭐ Consistency Bonus</h3>
-            <p class="rule">Reach <b>5 sales</b> in a day → earn <b>+1 point</b>.<br><br><b>5 sales = checkpoint = daily prize = consistency point.</b></p>
+            <p class="rule">Great performers don't just have one great day—they deliver all week long.<br><br>Achieve <b>5 or more sales each day, Monday through Friday</b>, and earn an additional <b style="color:var(--jersey)">$25 Consistency Bonus</b> on top of your standard incentives.</p>
           </div>
           <div class="motto">From Punta Gorda to Corozal.<span class="big">Four Weeks. One Country.<br>One Champion.</span></div>
           <button class="btn-sm vidplay" id="introVidBtn" style="display:none;width:100%;margin-top:10px">🎬 Play intro video</button>
@@ -795,8 +795,11 @@ function cardHTML(a){
   const nextTxt=rv>=100?'🏁 finished the course':`${toNext} to clear ${MILES[Math.min(cps+1,20)]}`;
   // Real consistency streak (consecutive days with +5 sales) when available;
   // fall back to the 5+/day-pace stand-in only offline (no streak data).
-  const pace=a.streak>0
-    ? `<span class="pacebadge" title="${a.streak} days in a row with 5+ sales">🔥 ${a.streak}-day streak</span>`
+  // Consistency Bonus: 5+ sales every day Mon–Fri (a 5-day streak) = $25.
+  const pace=a.streak>=5
+    ? `<span class="pacebadge" style="color:#3a2a00;background:var(--jersey);border-color:var(--jersey)" title="5+ sales every day Mon–Fri — $25 Consistency Bonus earned">🔥 ${a.streak}-day streak · $25 ✓</span>`
+    : a.streak>0
+    ? `<span class="pacebadge" title="${a.streak} day(s) in a row with 5+ sales · 5 days (Mon–Fri) earns the $25 Consistency Bonus">🔥 ${a.streak}-day streak</span>`
     : (a.streak==null && a.r>=5 ? '<span class="pacebadge">🔥 5+/day</span>' : '');
   const mix=[['MVA',a.mva],['WC',a.wc],['PI',a.pi],['Oth',a.oth]].filter(x=>x[1]!=null&&x[1]>0);
   const mixLine=mix.length?`<div class="mixline">${mix.map(x=>`${x[0]} <b>${x[1]}</b>`).join(' · ')}</div>`:'';
