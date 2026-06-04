@@ -19,6 +19,7 @@
 
   var POLL_MS = 25000;
   var didFilters = false;
+  var currentRace = "Tour of Belize";   // which race the board is showing
 
   function token() { return sessionStorage.getItem("tob_token") || ""; }
   // body classes gate the profile-edit UI: live + admin -> editable, else hidden
@@ -61,7 +62,8 @@
   async function loadStandings() {
     try {
       var m = (typeof raceMetric !== "undefined" ? raceMetric : "sales");
-      var r = await fetch(API + "/api/standings?metric=" + encodeURIComponent(m));
+      var r = await fetch(API + "/api/standings?metric=" + encodeURIComponent(m) +
+                          "&race=" + encodeURIComponent(currentRace));
       if (!r.ok) return;
       var data = await r.json();
       if (!data.riders || !data.riders.length) { renderAll(); return; } // keep seed if empty
@@ -230,13 +232,63 @@
     });
   }
 
+  /* ---------- races (Quantify gets its own leaderboard) ---------- */
+  async function loadRaces() {
+    try {
+      var d = await (await fetch(API + "/api/races")).json();
+      var races = d.races || [];
+      var sw = document.getElementById("raceSwitch");
+      var chips = document.getElementById("raceChips");
+      if (sw && chips) {
+        if (races.length > 1) {
+          sw.style.display = "";
+          chips.innerHTML = races.map(function (r) {
+            return '<button class="racechip ' + (r.name === currentRace ? "on" : "") +
+              '" data-race="' + r.name.replace(/"/g, "&quot;") + '">' + r.name +
+              ' <span style="opacity:.6">(' + r.count + ')</span></button>';
+          }).join("");
+        } else { sw.style.display = "none"; }
+      }
+      var box = document.getElementById("sepTeams");
+      if (box) {
+        var sep = d.separateTeams || [];
+        box.innerHTML = (d.allTeams || []).map(function (t) {
+          return '<label><input type="checkbox" data-team="' + t.replace(/"/g, "&quot;") +
+            '" ' + (sep.indexOf(t) >= 0 ? "checked" : "") + ">" + t + "</label>";
+        }).join("");
+      }
+    } catch (e) { console.warn("[TOB] races load failed", e); }
+  }
+
+  function bindRaces() {
+    var chips = document.getElementById("raceChips");
+    if (chips) chips.addEventListener("click", function (e) {
+      var b = e.target.closest(".racechip"); if (!b) return;
+      currentRace = b.dataset.race;
+      didFilters = false;            // teams differ per race → rebuild filters
+      if ("lbScope" in window) window.lbScope = "all";
+      loadRaces(); loadStandings();
+    });
+    var sep = document.getElementById("sepTeams");
+    if (sep) sep.addEventListener("change", async function (e) {
+      if (!e.target.closest("input[type=checkbox]")) return;
+      var teams = [].slice.call(sep.querySelectorAll("input:checked")).map(function (x) { return x.dataset.team; });
+      await putConfig({ separateTeams: teams });
+      if (currentRace !== "Tour of Belize" && teams.indexOf(currentRace) < 0) currentRace = "Tour of Belize";
+      didFilters = false;
+      await loadRaces(); await loadStandings();
+    });
+  }
+
   /* ---------- boot ---------- */
   async function boot() {
     reflectAdmin();
     rebindLogin();
     bindAccount();
+    bindRaces();
     await loadConfigAndProfiles();
     await loadStandings();
+    await loadRaces();
     setInterval(loadStandings, POLL_MS);
     console.info("[TOB] live mode on →", API);
   }

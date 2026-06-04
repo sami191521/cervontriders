@@ -37,6 +37,11 @@
   }
   .viewnav button:hover{transform:translateY(-2px)}
   .viewnav button.active{background:var(--jersey);color:#3a2a00;border-color:var(--jersey);box-shadow:0 3px 0 #b9931f}
+  .raceswitch{display:flex;align-items:center;gap:8px;margin-top:9px;position:relative;flex-wrap:wrap}
+  .raceswitch .rslabel{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:1.5px;font-size:11px;color:var(--jersey)}
+  .racechip{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:1px;font-size:12.5px;border:2px solid rgba(247,243,232,.25);background:rgba(255,255,255,.04);color:var(--cream);padding:5px 14px;border-radius:999px;cursor:pointer;transition:all .15s;margin-right:6px}
+  .racechip:hover{transform:translateY(-2px)}
+  .racechip.on{background:var(--jersey);color:#3a2a00;border-color:var(--jersey);box-shadow:0 2px 0 #b9931f}
   .admin-corner{position:absolute;top:12px;right:18px;z-index:6;font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:1.5px;font-size:12px;border:2px solid rgba(247,243,232,.3);background:rgba(255,255,255,.05);color:var(--cream);padding:7px 13px;border-radius:999px;cursor:pointer;transition:all .15s}
   .admin-corner:hover{transform:translateY(-2px);border-color:var(--jersey)}
   .admin-corner.on{background:var(--jersey);color:#3a2a00;border-color:var(--jersey)}
@@ -358,6 +363,9 @@
       <button data-view="leaderView">🏆 Leaderboard</button>
       <button data-view="ceremonyView">👑 Stage Winners</button>
     </div>
+    <div class="raceswitch" id="raceSwitch" style="display:none">
+      <span class="rslabel">🏁 Race</span><span id="raceChips"></span>
+    </div>
   </header>
 
   <main>
@@ -520,6 +528,11 @@
           </div>
           <div class="goalrow"><label>Team goal (sales)</label><input type="number" id="teamGoalInput" min="0" placeholder="e.g. 500" /></div>
           <p class="rule" style="opacity:.6;margin-top:8px">Set a goal to show each team's progress bar in standings. Leave blank to hide.</p>
+          <div class="raceset" style="margin-top:14px;border-top:1px dashed rgba(255,255,255,.12);padding-top:12px">
+            <label style="font-family:'Barlow Condensed';text-transform:uppercase;letter-spacing:1px;font-size:12px;opacity:.85">Separate races (own leaderboard)</label>
+            <p class="rule" style="opacity:.6;margin:2px 0 6px">Tick a team to pull it out of the main Tour into its own race — handy for a different campaign.</p>
+            <div id="sepTeams" class="togglegrid"></div>
+          </div>
         </div>
 
         <div class="card">

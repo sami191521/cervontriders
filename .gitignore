@@ -7,3 +7,6 @@ tob.sqlite3-shm
 .env
 static/uploads/
 .DS_Store
+tob_local.sqlite3
+tob_local.sqlite3-wal
+tob_local.sqlite3-shm

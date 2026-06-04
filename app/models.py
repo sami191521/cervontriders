@@ -102,6 +102,9 @@ class Config(BaseModel):
     )
     videos: Videos = Field(default_factory=Videos)
     lastUpdated: Optional[str] = None        # ISO timestamp of most recent ingest
+    # teams pulled out of the main Tour into their own separate race (own
+    # leaderboard/podium), e.g. a different campaign. Empty = everyone in one race.
+    separateTeams: list[str] = Field(default_factory=list)
 
 
 class ConfigUpdate(BaseModel):
@@ -110,6 +113,7 @@ class ConfigUpdate(BaseModel):
     teamGoal: Optional[int] = None
     visibleStats: Optional[list[str]] = None
     videos: Optional[Videos] = None
+    separateTeams: Optional[list[str]] = None
 
 
 class CredentialUpdate(BaseModel):
@@ -132,6 +136,7 @@ class StandingsResponse(BaseModel):
     """Shape returned by GET /api/standings (handoff §10)."""
     lastUpdated: Optional[str] = None
     raceMetric: RaceMetric = "sales"
+    race: str = "Tour of Belize"             # which race these standings are for
     scope: str = "all"                       # "all" or a team name
     riders: list[Rider] = Field(default_factory=list)
     teams: list[TeamStanding] = Field(default_factory=list)

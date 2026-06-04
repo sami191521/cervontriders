@@ -55,11 +55,25 @@ app.add_middleware(
 )
 
 
+DEFAULT_RACE = "Tour of Belize"
+
+
+def _race_filter(data: list[dict], race: str, separate: list[str]) -> list[dict]:
+    """Riders belonging to `race`. A separate team is its own race; the default
+    race is everyone NOT in a separate team."""
+    if race and race != DEFAULT_RACE:
+        return [a for a in data if (a.get("tl") or "Unassigned") == race]
+    return [a for a in data if (a.get("tl") or "Unassigned") not in separate]
+
+
 # ---------- composition: build the standings response -----------------------
-def build_standings(metric: Optional[str] = None, scope: str = "all") -> StandingsResponse:
+def build_standings(metric: Optional[str] = None, scope: str = "all",
+                    race: Optional[str] = None) -> StandingsResponse:
     cfg = db.get_config()
     metric = metric or cfg.raceMetric
-    data = db.get_dataset()
+    race = race or DEFAULT_RACE
+    # only this race's riders, so ranks/jerseys/podium are computed within it
+    data = _race_filter(db.get_dataset(), race, cfg.separateTeams or [])
     res = st.compute_standings(
         data,
         race_metric=metric,
@@ -71,13 +85,13 @@ def build_standings(metric: Optional[str] = None, scope: str = "all") -> Standin
     )
     riders = res["riders"]
     if scope != "all":
-        riders = [r for r in riders if r.tl == scope]   # keep GC ranks within group
+        riders = [r for r in riders if r.tl == scope]   # keep ranks within group
     # weekly stage standings: riders ranked by this week's score (§8). Empty
     # until a Monday baseline exists, which tells the UI to fall back to GC.
     stage = sorted([r for r in riders if r.week > 0],
                    key=lambda r: (-r.week, -r.r, r.n))
     return StandingsResponse(
-        lastUpdated=cfg.lastUpdated, raceMetric=metric, scope=scope,
+        lastUpdated=cfg.lastUpdated, raceMetric=metric, race=race, scope=scope,
         riders=riders, teams=res["teams"], jerseys=res["jerseys"],
         stageWinners=stage, weekStart=db.kv_get("week_start"),
     )
@@ -212,8 +226,24 @@ async def ingest(
 
 # ---------- standings --------------------------------------------------------
 @app.get("/api/standings", response_model=StandingsResponse)
-def standings(metric: Optional[RaceMetric] = None, scope: str = "all"):
-    return build_standings(metric, scope)
+def standings(metric: Optional[RaceMetric] = None, scope: str = "all",
+              race: Optional[str] = None):
+    return build_standings(metric, scope, race)
+
+
+@app.get("/api/races")
+def races():
+    """The list of races (default Tour + each separate team), with rider counts."""
+    cfg = db.get_config()
+    data = db.get_dataset()
+    sep = cfg.separateTeams or []
+    teams_present = sorted({(a.get("tl") or "Unassigned") for a in data})
+    out = [{"name": DEFAULT_RACE,
+            "count": len(_race_filter(data, DEFAULT_RACE, sep))}]
+    for t in sep:
+        if t in teams_present:
+            out.append({"name": t, "count": len(_race_filter(data, t, sep))})
+    return {"races": out, "separateTeams": sep, "allTeams": teams_present}
 
 
 # ---------- racer bib numbers (fixed per agent, e.g. from last month) --------
