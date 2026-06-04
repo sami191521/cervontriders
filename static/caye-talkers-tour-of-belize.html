@@ -1423,10 +1423,7 @@ function buildStatToggles(){
   // dynamic toggles for any extra columns kept from the uploaded file
   const exKeys=new Set();
   AGENTS.forEach(a=>{if(a.extra)Object.keys(a.extra).forEach(k=>exKeys.add(k));});
-  if(exKeys.size){
-    html+=`<label style="grid-column:1/-1;cursor:default;opacity:.55;background:none;border:none;font-family:'Barlow Condensed';text-transform:uppercase;letter-spacing:1px;font-size:11px">— Extra fields from your file —</label>`;
-    [...exKeys].sort().forEach(name=>{const key='x:'+name;const on=visibleStats.has(key);html+=`<label><input type="checkbox" data-key="${key}" ${on?'checked':''}>${name}</label>`;});
-  }
+  [...exKeys].sort().forEach(name=>{const key='x:'+name;const on=visibleStats.has(key);html+=`<label><input type="checkbox" data-key="${key}" ${on?'checked':''}>${name}</label>`;});
   document.getElementById('statToggles').innerHTML=html;
 }
 document.getElementById('statToggles').addEventListener('change',e=>{
