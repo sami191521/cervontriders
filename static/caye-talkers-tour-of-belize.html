@@ -1384,7 +1384,7 @@ function applyMapping(){
   }).filter(Boolean);
   if(!built.length){admStatus('No rows parsed — check the mapping.','err');return;}
   lastUpdated=new Date().toISOString();
-  AGENTS=built; recompute(); buildFilters(); persistDataset(); persistMeta();
+  AGENTS=built; recompute(); buildFilters(); buildStatToggles(); persistDataset(); persistMeta();
   renderStandings(); renderGrid(); renderTop10(); renderCeremony(); refreshPeloton(); renderLeaderboard();
   admStatus(`Board updated with ${built.length} riders across ${new Set(built.map(a=>a.tl)).size} teams.`,'ok');
   document.querySelector('.viewnav button[data-view="mapView"]').click();

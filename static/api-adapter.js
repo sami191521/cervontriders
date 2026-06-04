@@ -39,7 +39,8 @@
   function renderAll() {
     renderStandings(); renderGrid(); renderTop10();
     renderCeremony(); refreshPeloton(); renderLeaderboard();
-    if (!didFilters) { buildFilters(); if (typeof buildStatToggles === "function") buildStatToggles(); didFilters = true; }
+    if (typeof buildStatToggles === "function") buildStatToggles();   // refresh extra-field toggles each load
+    if (!didFilters) { buildFilters(); didFilters = true; }
   }
 
   /* ---------- load ---------- */
