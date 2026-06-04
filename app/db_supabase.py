@@ -161,6 +161,12 @@ def record_ingest(riders: list[dict], when: Optional[datetime] = None) -> dict:
                headers=_headers({"Prefer": "resolution=merge-duplicates"}),
                json=[{"ts": iso, "riders_json": riders}])
 
+    # 5. every rider gets a racer bib number (new agents get the next free one)
+    bibs = kv_get("bibs", {}) or {}
+    new_bibs = st.assign_missing_bibs(bibs, riders, cfg.separateTeams or [])
+    if new_bibs != bibs:
+        kv_set("bibs", new_bibs)
+
     return {"lastUpdated": iso, "newWeek": new_week}
 
 

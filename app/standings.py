@@ -153,6 +153,32 @@ def compute_standings(
     }
 
 
+DEFAULT_RACE = "Tour of Belize"
+
+
+def assign_missing_bibs(bibs: dict, riders: list[dict], separate_teams: list) -> dict:
+    """Give every rider a racer number. The main Tour continues its sequence;
+    each separate-race team gets its own numbering (1, 2, 3 …). Returns a new
+    bibs dict (unchanged entries preserved)."""
+    bibs = dict(bibs or {})
+    separate = set(separate_teams or [])
+    next_main = max(bibs.values(), default=0) + 1
+    # next number within each separate race = max among that race's current bibbed riders + 1
+    sep_next = {}
+    for t in separate:
+        have = [bibs[a["id"]] for a in riders if (a.get("tl") == t and a["id"] in bibs)]
+        sep_next[t] = (max(have) if have else 0) + 1
+    for a in riders:
+        if a["id"] in bibs:
+            continue
+        tl = a.get("tl") or "Unassigned"
+        if tl in separate:
+            bibs[a["id"]] = sep_next[tl]; sep_next[tl] += 1
+        else:
+            bibs[a["id"]] = next_main; next_main += 1
+    return bibs
+
+
 def snapshot_ranks(result_riders: list[Rider]) -> tuple[dict, dict]:
     """Snapshot {id->rank} and {id->ld} for movement on the *next* upload (§6)."""
     return (
