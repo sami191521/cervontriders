@@ -67,6 +67,7 @@ def build_standings(metric: Optional[str] = None, scope: str = "all") -> Standin
         prev_sales=db.get_prev_sales(),
         week_baseline=db.get_week_baseline() or None,
         streaks=db.get_streaks(),
+        bibs=db.kv_get("bibs", {}) or {},
     )
     riders = res["riders"]
     if scope != "all":
@@ -213,6 +214,35 @@ async def ingest(
 @app.get("/api/standings", response_model=StandingsResponse)
 def standings(metric: Optional[RaceMetric] = None, scope: str = "all"):
     return build_standings(metric, scope)
+
+
+# ---------- racer bib numbers (fixed per agent, e.g. from last month) --------
+@app.get("/api/bibs")
+def get_bibs():
+    """{ rider_id -> bib number }."""
+    return db.kv_get("bibs", {}) or {}
+
+
+@app.put("/api/bibs")
+def put_bibs(body: dict = Body(...), _: bool = Depends(auth.require_admin)):
+    """Set the full bib mapping ({rider_id: number}). Replaces existing."""
+    bibs = {}
+    for k, v in (body or {}).items():
+        try:
+            bibs[str(k)] = int(v)
+        except (TypeError, ValueError):
+            continue
+    db.kv_set("bibs", bibs)
+    return {"ok": True, "count": len(bibs)}
+
+
+@app.post("/api/bibs/lock")
+def lock_bibs(_: bool = Depends(auth.require_admin)):
+    """Freeze the CURRENT standings order as each racer's permanent bib number."""
+    res = build_standings()
+    bibs = {r.id: r.rank for r in res.riders}
+    db.kv_set("bibs", bibs)
+    return {"ok": True, "count": len(bibs)}
 
 
 # ---------- config -----------------------------------------------------------

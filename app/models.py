@@ -42,6 +42,10 @@ class Rider(BaseModel):
     pi: Optional[int] = None
     oth: Optional[int] = None
 
+    # fixed racer bib number (assigned from last month's final standings; stays
+    # the same all month regardless of current position). null if unassigned.
+    bib: Optional[int] = None
+
     # server-derived (handoff §2, §5, §8)
     rank: int = 0                            # position by active race metric
     dRank: int = 0                           # rank change since previous upload (+ = climbed)

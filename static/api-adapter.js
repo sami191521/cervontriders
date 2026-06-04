@@ -75,7 +75,7 @@
       recompute();
       AGENTS.forEach(function (a) {
         var s = byId[a.id];
-        if (s) { a.dRank = s.dRank; a.dSales = s.dSales; a.week = s.week; a.streak = s.streak; }
+        if (s) { a.dRank = s.dRank; a.dSales = s.dSales; a.week = s.week; a.streak = s.streak; a.bib = s.bib; }
       });
       renderAll();
     } catch (e) { console.warn("[TOB] standings load failed", e); }

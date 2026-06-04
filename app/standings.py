@@ -61,6 +61,7 @@ def compute_standings(
     prev_sales: Optional[dict] = None,
     week_baseline: Optional[dict] = None,
     streaks: Optional[dict] = None,
+    bibs: Optional[dict] = None,
 ) -> dict:
     """Return {riders:[Rider], teams:[TeamStanding], jerseys:Jerseys, order:[id]}.
 
@@ -72,6 +73,7 @@ def compute_standings(
     prev_rank = prev_rank or {}
     prev_sales = prev_sales or {}
     streaks = streaks or {}
+    bibs = bibs or {}
 
     # rank order: race value desc, then sales/day desc, then name (HTML byLeads)
     by_leads = sorted(
@@ -92,6 +94,7 @@ def compute_standings(
         else:
             a["week"] = 0
         a["streak"] = int(streaks.get(rid, 0))
+        a["bib"] = bibs.get(rid)
 
     # --- jerseys (HTML selection) ---
     yellow = by_leads[0] if by_leads else None

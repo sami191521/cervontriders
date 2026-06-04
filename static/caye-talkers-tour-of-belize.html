@@ -151,6 +151,7 @@
   .rname .nm{font-family:'Anton';font-size:19px;line-height:1;letter-spacing:.3px}
   .rname .nick{font-family:'Barlow';font-size:12.5px;color:var(--jersey);font-style:italic;margin-top:3px;min-height:16px}
   .rname .team-tag{display:inline-block;font-family:'Barlow Condensed';text-transform:uppercase;letter-spacing:1px;font-size:10.5px;background:var(--team);color:#fff;padding:2px 8px;border-radius:6px;margin-top:6px}
+  .rname .bibtag{display:inline-block;font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:1px;font-size:10.5px;background:rgba(244,196,48,.16);color:#f7d44c;border:1px solid #f4c430;padding:2px 8px;border-radius:6px;margin-top:6px;margin-left:5px}
   .rname .ten{display:inline-block;font-family:'Barlow Condensed';text-transform:uppercase;letter-spacing:1px;font-size:10.5px;border:1px solid rgba(255,255,255,.25);padding:2px 8px;border-radius:6px;margin-top:6px;margin-left:5px;opacity:.85}
   .jbadges{display:flex;gap:5px;padding:0 15px 4px;flex-wrap:wrap;min-height:0}
   .jb{font-size:11px;font-family:'Barlow Condensed';font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 8px;border-radius:20px;display:flex;align-items:center;gap:4px}
@@ -328,6 +329,7 @@
   .lbrow .c-cp{font-size:12.5px;color:#42526b;text-align:center}
   .lbrow .c-extra{font-size:12px;color:#42526b}
   .gctag{font-family:'Barlow Condensed';font-size:10.5px;letter-spacing:.5px;background:rgba(20,33,61,.1);color:#42526b;padding:1px 6px;border-radius:5px;vertical-align:middle}
+  .lbbib{font-family:'Anton';font-size:12px;color:#b9831f;background:rgba(244,196,48,.2);border:1px solid rgba(244,196,48,.6);padding:0 6px;border-radius:5px;vertical-align:middle}
   @media(max-width:640px){
     .lbrow{grid-template-columns:34px 1fr 64px 44px;font-size:13px}
     .lbrow .c-team,.lbrow .c-extra,.lbhdr .c-team,.lbhdr .c-extra{display:none}
@@ -794,7 +796,7 @@ function cardHTML(a){
       <div class="rname">
         <div class="nm">${a.n} ${mv}</div>
         <div class="nick">${p.nickname?('“'+p.nickname+'”'):'<span style="opacity:.4;font-style:normal">add a nickname ↓</span>'}</div>
-        <span class="team-tag">Team ${a.tl}</span><span class="ten">${tenInfo(a.tn).label}</span>
+        <span class="team-tag">Team ${a.tl}</span><span class="ten">${tenInfo(a.tn).label}</span>${a.bib?`<span class="bibtag">🏁 #${a.bib}</span>`:''}
       </div>
     </div>
     <div class="jbadges">${jbadges(a)}${pace}</div>
@@ -999,7 +1001,7 @@ function renderLeaderboard(){
       const jb=(yellow&&a.id===yellow.id?'🟡':'')+(green&&a.id===green.id?'🟢':'')+(polka&&a.id===polka.id?'🔴':'')+(white&&a.id===white.id?'⚪':'')+(cleanRider&&a.id===cleanRider.id?'✨':'');
       const pace=a.streak>0?('🔥'+a.streak):(a.streak==null&&a.r>=5?'🔥':'');
       return `<div class="lbrow"><span class="c-pos ${med}">${i+1}</span>`+
-        `<span class="c-name"><b>${a.n}</b> ${mv} ${jb} ${gc}</span>`+
+        `<span class="c-name">${a.bib?`<span class="lbbib">#${a.bib}</span> `:''}<b>${a.n}</b> ${mv} ${jb} ${gc}</span>`+
         `<span class="c-team"><span class="tdot" style="background:${tc}"></span>${a.tl}</span>`+
         `<span class="c-val">${raceVal(a)}</span>`+
         `<span class="c-cp">${cpsOf(a)}/20</span>`+
