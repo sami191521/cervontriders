@@ -320,7 +320,7 @@
   .lbsum .v.sm{font-family:'Barlow';font-weight:700;font-size:14px;margin-top:3px}
   .lbsum .v small{font-size:12px;opacity:.6}
   .lbtable{background:var(--cream);border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.18)}
-  .lbrow{display:grid;grid-template-columns:46px 1fr 130px 70px 56px 120px;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(20,33,61,.08);color:#1f2d44;font-size:14px}
+  .lbrow{display:grid;grid-template-columns:46px 1fr 130px 70px 56px 90px 90px 100px;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(20,33,61,.08);color:#1f2d44;font-size:14px}
   .lbrow:last-child{border-bottom:none}
   .lbrow:nth-child(even){background:rgba(20,33,61,.03)}
   .lbhdr{background:#14213d;color:var(--cream);font-family:'Barlow Condensed';text-transform:uppercase;letter-spacing:1px;font-size:11px;position:sticky;top:0}
@@ -337,7 +337,7 @@
   .lbbib{font-family:'Anton';font-size:12px;color:#b9831f;background:rgba(244,196,48,.2);border:1px solid rgba(244,196,48,.6);padding:0 6px;border-radius:5px;vertical-align:middle}
   @media(max-width:640px){
     .lbrow{grid-template-columns:34px 1fr 64px 44px;font-size:13px}
-    .lbrow .c-team,.lbrow .c-extra,.lbhdr .c-team,.lbhdr .c-extra{display:none}
+    .lbrow .c-team,.lbrow .c-extra,.lbhdr .c-team,.lbhdr .c-extra,.lbrow .c-th,.lbrow .c-ah,.lbhdr .c-th,.lbhdr .c-ah{display:none}
   }
 
   @media (max-width:760px){
@@ -1010,7 +1010,7 @@ function renderLeaderboard(){
       <div class="lbsum"><div class="k">On 5+/day pace</div><div class="v">${onpace}<small>/${list.length}</small></div></div>
       <div class="lbsum"><div class="k">Top mover</div><div class="v sm">${mover?(mover.n+' ▲'+mover.dRank):'—'}</div></div>
     </div>`;
-  tbl.innerHTML=`<div class="lbrow lbhdr"><span class="c-pos">#</span><span class="c-name">Rider</span><span class="c-team">Team</span><span class="c-val">${raceMetric==='target'?'% Tgt':'Sales'}</span><span class="c-cp">CP</span><span class="c-extra">Pace</span></div>`+
+  tbl.innerHTML=`<div class="lbrow lbhdr"><span class="c-pos">#</span><span class="c-name">Rider</span><span class="c-team">Team</span><span class="c-val">${raceMetric==='target'?'% Tgt':'Sales'}</span><span class="c-cp">CP</span><span class="c-th">Prod Hrs</span><span class="c-ah">Avg Hrs</span><span class="c-extra">Pace</span></div>`+
     list.map((a,i)=>{
       const mv=a.dRank>0?`<span class="mv up">▲${a.dRank}</span>`:a.dRank<0?`<span class="mv dn">▼${-a.dRank}</span>`:'';
       const med=i<3?('m'+(i+1)):'';
@@ -1018,11 +1018,15 @@ function renderLeaderboard(){
       const gc=lbScope!=='all'?`<span class="gctag">GC #${a.rank}</span>`:'';
       const jb=(yellow&&a.id===yellow.id?'🟡':'')+(green&&a.id===green.id?'🟢':'')+(polka&&a.id===polka.id?'🔴':'')+(white&&a.id===white.id?'⚪':'')+(cleanRider&&a.id===cleanRider.id?'✨':'');
       const pace=a.streak>0?('🔥'+a.streak):(a.streak==null&&a.r>=5?'🔥':'');
+      const th=a.th!=null?a.th.toFixed(1):'—';
+      const ah=a.ah!=null?a.ah.toFixed(1):'—';
       return `<div class="lbrow"><span class="c-pos ${med}">${i+1}</span>`+
         `<span class="c-name">${a.bib?`<span class="lbbib">#${a.bib}</span> `:''}<b>${a.n}</b> ${mv} ${jb} ${gc}</span>`+
         `<span class="c-team"><span class="tdot" style="background:${tc}"></span>${a.tl}</span>`+
         `<span class="c-val">${raceVal(a)}</span>`+
         `<span class="c-cp">${cpsOf(a)}/20</span>`+
+        `<span class="c-th">${th}</span>`+
+        `<span class="c-ah">${ah}</span>`+
         `<span class="c-extra">${a.r.toFixed(1)}/day ${pace}</span></div>`;
     }).join('');
 }
