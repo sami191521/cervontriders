@@ -660,8 +660,8 @@ const STAT_DEFS=[
   {key:'d', group:'stage', label:'Days present', fmt:a=>a.d},
   {key:'th',group:'stage', label:'Productive hrs', fmt:a=>a.th.toFixed(0)+'<small>h</small>'},
   {key:'tw',group:'stage', label:'Total wait', fmt:a=>a.tw.toFixed(0)+'<small>m</small>', off:true},
-  {key:'target',group:'extra',label:'Target hit %', fmt:a=>a.target!=null?(a.target*100).toFixed(0)+'<small>%</small>':'—', off:true},
-  {key:'conv', group:'extra',label:'Conversion %', fmt:a=>a.conv!=null?(a.conv*100).toFixed(1)+'<small>%</small>':'—', off:true},
+  {key:'target',group:'extra',label:'Target hit %', fmt:a=>a.target!=null?(a.target<=2?(a.target*100).toFixed(0):a.target.toFixed(0))+'<small>%</small>':'—', off:true},
+  {key:'conv', group:'extra',label:'Conversion %', fmt:a=>a.conv!=null?(a.conv<=2?(a.conv*100).toFixed(1):a.conv.toFixed(1))+'<small>%</small>':'—', off:true},
   {key:'valid',group:'extra',label:'Valid leads', fmt:a=>a.valid!=null?a.valid:'—', off:true}
 ];
 let visibleStats=new Set(STAT_DEFS.filter(s=>!s.off).map(s=>s.key));
@@ -773,6 +773,7 @@ function cardHTML(a){
   const sCell=s=>`<div class="stat"><div class="k">${s.label}</div><div class="v">${s.fmt(a)}</div></div>`;
   const dCells=STAT_DEFS.filter(s=>s.group==='daily'&&visibleStats.has(s.key)).map(sCell).join('');
   const gCells=STAT_DEFS.filter(s=>(s.group==='stage'||s.group==='extra')&&visibleStats.has(s.key)).map(sCell).join('');
+  const exCells=[...visibleStats].filter(k=>k.indexOf('x:')===0).map(k=>{const name=k.slice(2);const v=(a.extra||{})[name];if(v==null||String(v).trim()==='')return '';return `<div class="stat"><div class="k">${name}</div><div class="v" style="font-size:14px">${v}</div></div>`;}).join('');
   const mv=a.dRank>0?`<span class="mv up">▲${a.dRank}</span>`:a.dRank<0?`<span class="mv dn">▼${-a.dRank}</span>`:'';
   const ahead=byLeads[a.rank-2];
   const gap=ahead?Math.max(0,raceVal(ahead)-rv):0;
@@ -811,6 +812,7 @@ function cardHTML(a){
     <div class="statsec">
       ${dCells?`<div class="lab">Daily · Checkpoint pace</div><div class="stats">${dCells}</div>`:''}
       ${gCells?`<div class="lab">Stage · Weekly totals</div><div class="stats">${gCells}</div>`:''}
+      ${exCells?`<div class="lab">From your file</div><div class="stats">${exCells}</div>`:''}
     </div>
     <div class="editsec">
       <input class="f-nick" type="text" maxlength="40" placeholder="Nickname (e.g. The Cayo Cannonball)" value="${(p.nickname||'').replace(/"/g,'&quot;')}">
@@ -1363,9 +1365,12 @@ function applyMapping(){
   /* snapshot current standings so the next board shows movement since this upload */
   prevRank={}; prevSales={};
   byLeads.forEach(a=>{prevRank[a.id]=a.rank;prevSales[a.id]=a.ld;});
+  const mappedHeaders=new Set(Object.values(fieldMap).filter(Boolean));
   const built=uploadedRows.map(row=>{
     const g=k=>{const h=fieldMap[k];return h?row[h]:undefined;};
     const name=String(g('n')||'').trim(); if(!name)return null;
+    const extra={};  // keep unmapped columns verbatim, for optional display
+    uploadedHeaders.forEach(h=>{if(h&&!mappedHeaders.has(h)){const v=row[h];const s=v==null?'':String(v).trim();if(s&&!/^\(?blank\)?$/i.test(s))extra[h]=v;}});
     let pp=num(g('pp')); if(pp&&pp<=2)pp=pp*100;
     const tlraw=String(g('tlraw')||'').trim();
     return {n:name, id:name.toLowerCase().replace(/[^a-z0-9]+/g,'-'),
@@ -1375,7 +1380,7 @@ function applyMapping(){
       tw:num(g('tw')), aw:num(g('aw')), ld:Math.round(num(g('ld'))), r:num(g('r')),
       target:fieldMap.target?num(g('target')):null, conv:fieldMap.conv?num(g('conv')):null, valid:fieldMap.valid?Math.round(num(g('valid'))):null,
       validpct:fieldMap.validpct?((p=>p&&p<=2?p*100:p)(num(g('validpct')))):null,
-      mva:fieldMap.mva?Math.round(num(g('mva'))):null, wc:fieldMap.wc?Math.round(num(g('wc'))):null, pi:fieldMap.pi?Math.round(num(g('pi'))):null, oth:fieldMap.oth?Math.round(num(g('oth'))):null};
+      mva:fieldMap.mva?Math.round(num(g('mva'))):null, wc:fieldMap.wc?Math.round(num(g('wc'))):null, pi:fieldMap.pi?Math.round(num(g('pi'))):null, oth:fieldMap.oth?Math.round(num(g('oth'))):null, extra};
   }).filter(Boolean);
   if(!built.length){admStatus('No rows parsed — check the mapping.','err');return;}
   lastUpdated=new Date().toISOString();
@@ -1411,10 +1416,18 @@ document.getElementById('loadBtn').addEventListener('click',()=>{
 document.getElementById('applyBtn').addEventListener('click',applyMapping);
 
 function buildStatToggles(){
-  document.getElementById('statToggles').innerHTML=STAT_DEFS.map(s=>{
+  let html=STAT_DEFS.map(s=>{
     const on=visibleStats.has(s.key)||s.core;
     return `<label class="${s.core?'core':''}"><input type="checkbox" data-key="${s.key}" ${on?'checked':''} ${s.core?'disabled':''}>${s.label}${s.core?' · always':''}</label>`;
   }).join('');
+  // dynamic toggles for any extra columns kept from the uploaded file
+  const exKeys=new Set();
+  AGENTS.forEach(a=>{if(a.extra)Object.keys(a.extra).forEach(k=>exKeys.add(k));});
+  if(exKeys.size){
+    html+=`<label style="grid-column:1/-1;cursor:default;opacity:.55;background:none;border:none;font-family:'Barlow Condensed';text-transform:uppercase;letter-spacing:1px;font-size:11px">— Extra fields from your file —</label>`;
+    [...exKeys].sort().forEach(name=>{const key='x:'+name;const on=visibleStats.has(key);html+=`<label><input type="checkbox" data-key="${key}" ${on?'checked':''}>${name}</label>`;});
+  }
+  document.getElementById('statToggles').innerHTML=html;
 }
 document.getElementById('statToggles').addEventListener('change',e=>{
   const cb=e.target.closest('input[type=checkbox]'); if(!cb)return;
@@ -1422,7 +1435,7 @@ document.getElementById('statToggles').addEventListener('change',e=>{
   if(cb.checked)visibleStats.add(k); else visibleStats.delete(k);
   persistStats(); renderGrid();
 });
-function persistDataset(){if(!hasStore)return;try{window.storage.set('dataset',JSON.stringify(AGENTS.map(a=>({n:a.n,tl:a.tl,tlraw:a.tlraw,tn:a.tn,status:a.status,d:a.d,th:a.th,ah:a.ah,pp:a.pp,tw:a.tw,aw:a.aw,ld:a.ld,r:a.r,target:a.target,conv:a.conv,valid:a.valid,validpct:a.validpct,mva:a.mva,wc:a.wc,pi:a.pi,oth:a.oth}))),false);}catch(e){}}
+function persistDataset(){if(!hasStore)return;try{window.storage.set('dataset',JSON.stringify(AGENTS.map(a=>({n:a.n,tl:a.tl,tlraw:a.tlraw,tn:a.tn,status:a.status,d:a.d,th:a.th,ah:a.ah,pp:a.pp,tw:a.tw,aw:a.aw,ld:a.ld,r:a.r,target:a.target,conv:a.conv,valid:a.valid,validpct:a.validpct,mva:a.mva,wc:a.wc,pi:a.pi,oth:a.oth,extra:a.extra}))),false);}catch(e){}}
 function persistStats(){if(!hasStore)return;try{window.storage.set('visiblestats',JSON.stringify([...visibleStats]),false);}catch(e){}}
 function persistMeta(){if(!hasStore)return;try{window.storage.set('meta',JSON.stringify({prevRank,prevSales,lastUpdated,raceMetric,teamGoal}),false);}catch(e){}}
 

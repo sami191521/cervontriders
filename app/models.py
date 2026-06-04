@@ -42,6 +42,10 @@ class Rider(BaseModel):
     pi: Optional[int] = None
     oth: Optional[int] = None
 
+    # any upload columns not mapped to a known field — kept verbatim so the
+    # admin can choose to display them ({column name: value as in the file}).
+    extra: dict = Field(default_factory=dict)
+
     # fixed racer bib number (assigned from last month's final standings; stays
     # the same all month regardless of current position). null if unassigned.
     bib: Optional[int] = None

@@ -155,6 +155,7 @@ def build_riders(rows: list[dict], field_map: dict) -> list[dict]:
         h = field_map.get(key)
         return row.get(h) if h else None
 
+    mapped_headers = {h for h in field_map.values() if h}
     out = []
     for row in rows:
         name = str(col(row, "n") or "").strip()
@@ -196,6 +197,15 @@ def build_riders(rows: list[dict], field_map: dict) -> list[dict]:
                 rider[key] = round(v)
             else:
                 rider[key] = v
+
+        # keep every unmapped column verbatim, for optional display later
+        extra = {}
+        for h, val in row.items():
+            if h and h not in mapped_headers:
+                s = "" if val is None else str(val).strip()
+                if s and not re.fullmatch(r"\(?blank\)?", s, re.I):
+                    extra[h] = val
+        rider["extra"] = extra
         out.append(rider)
 
     if not out:
