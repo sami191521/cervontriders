@@ -1286,30 +1286,20 @@ function pelotonPopup(a){
 function p_(a){return (getP(a.id).nickname||'');}
 let pelotonGroup=null, pelotonOn=true;   // Live Peloton on by default
 function buildPeloton(){
-  // No clustering — every rider shows as their own photo-dot. Riders who share the
-  // same sales total land on the exact same spot, so we fan them out in a small
-  // phyllotaxis (sunflower) spiral around that point: the pack stays visible and
-  // each rider's photo + bib shows instead of being hidden behind a count bubble.
-  pelotonGroup=L.layerGroup();
-  const groups={};
-  byLeads.forEach(a=>{const k=raceVal(a);(groups[k]=groups[k]||[]).push(a);});
-  Object.keys(groups).forEach(k=>{
-    const grp=groups[k], c=riderLatLng(+k), lonScale=1/Math.max(.3,Math.cos(c[0]*Math.PI/180));
-    grp.forEach((a,i)=>{
-      let lat=c[0], lng=c[1];
-      if(grp.length>1){
-        const ang=i*2.399963267, rad=0.018*Math.sqrt(i+0.6);   // golden-angle spiral
-        lat+=rad*Math.cos(ang); lng+=rad*Math.sin(ang)*lonScale;
-      }
-      const tc=teamColor(a.tl);
-      const ph=getP(a.id).photo;
-      const num=a.bib||a.rank;
-      const inner=ph
-        ? `<div class="pelo-face" style="background:${tc}"><img src="${ph}" alt="" loading="eager"></div><span class="pelo-num">${num}</span>`
-        : `<div class="pelo-face" style="background:${tc}">${num}</div>`;
-      const icon=L.divIcon({html:`<div class="pelo-dot" title="${a.n}">${inner}</div>`,className:'',iconSize:[36,36],iconAnchor:[18,18]});
-      L.marker([lat,lng],{icon,zIndexOffset:ph?500:0}).bindPopup(pelotonPopup(a)).on('mouseover',function(){this.openPopup();}).on('mouseout',function(){this.closePopup();}).addTo(pelotonGroup);
-    });
+  pelotonGroup=L.markerClusterGroup({
+    maxClusterRadius:30, showCoverageOnHover:false, spiderfyOnMaxZoom:true, zoomToBoundsOnClick:true,
+    spiderfyDistanceMultiplier:1.4,
+    iconCreateFunction:c=>L.divIcon({html:`<div class="pelo-cluster">${c.getChildCount()}</div>`,className:'',iconSize:[34,34]})
+  });
+  byLeads.forEach(a=>{
+    const tc=teamColor(a.tl);
+    const ph=getP(a.id).photo;
+    const num=a.bib||a.rank;
+    const inner=ph
+      ? `<div class="pelo-face" style="background:${tc}"><img src="${ph}" alt=""></div><span class="pelo-num">${num}</span>`
+      : `<div class="pelo-face" style="background:${tc}">${num}</div>`;
+    const icon=L.divIcon({html:`<div class="pelo-dot" title="${a.n}">${inner}</div>`,className:'',iconSize:[36,36],iconAnchor:[18,18]});
+    L.marker(riderLatLng(raceVal(a)),{icon}).bindPopup(pelotonPopup(a)).on('mouseover',function(){this.openPopup();}).on('mouseout',function(){this.closePopup();}).addTo(pelotonGroup);
   });
 }
 const peloBtn=document.getElementById('peloBtn');
