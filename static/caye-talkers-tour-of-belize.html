@@ -1474,7 +1474,9 @@ function renderFact(){
   const el=document.getElementById('factText'); if(!el)return;
   const leader=byLeads[0]; if(!leader){el.textContent='';return;}
   const town=MILES[cpsOf(leader)];
-  el.textContent=BELIZE_FACTS[town]||`The race leader is rolling through ${town}.`;
+  const fact=BELIZE_FACTS[town];
+  const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  el.innerHTML=`🏆 Race leader <b style="color:var(--jersey)">${esc(leader.n)}</b> is rolling through ${esc(town)}.`+(fact?` ${esc(fact)}`:'');
   const t=document.getElementById('factTown'); if(t)t.textContent='📍 '+town;
 }
 
