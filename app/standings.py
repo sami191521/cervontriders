@@ -95,6 +95,10 @@ def compute_standings(
             a["week"] = 0
         a["streak"] = int(streaks.get(rid, 0))
         a["bib"] = bibs.get(rid)
+        # avg productive hours/day: derive from totals when the upload omits the
+        # dedicated column (files often carry Total Hours + Present Days only).
+        if not a.get("ah") and (a.get("th") or 0) > 0 and (a.get("d") or 0) > 0:
+            a["ah"] = round(float(a["th"]) / float(a["d"]), 2)
 
     # --- jerseys (HTML selection) ---
     yellow = by_leads[0] if by_leads else None
