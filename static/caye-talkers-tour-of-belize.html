@@ -1275,7 +1275,7 @@ function pelotonPopup(a){
   return `<div style="--pop:${tc}"><div class="pop-week">Bib #${a.bib||a.rank} · Team ${a.tl}</div><div class="pop-name">${a.n}${nick}</div><div class="pop-meta"><span class="sales">${rv} ${raceUnit()} · ${cp}/20 checkpoints</span><span>📍 at ${town}</span></div></div>`;
 }
 function p_(a){return (getP(a.id).nickname||'');}
-let pelotonGroup=null, pelotonOn=false;
+let pelotonGroup=null, pelotonOn=true;   // Live Peloton on by default
 function buildPeloton(){
   pelotonGroup=L.markerClusterGroup({
     maxClusterRadius:30, showCoverageOnHover:false, spiderfyOnMaxZoom:true, zoomToBoundsOnClick:true,
@@ -1301,6 +1301,7 @@ peloBtn.addEventListener('click',()=>{
     peloBtn.classList.remove('on');
   }
 });
+if(pelotonOn)peloBtn.classList.add('on');   // reflect default-on state
 function refreshPeloton(){
   if(pelotonGroup){map.removeLayer(pelotonGroup);pelotonGroup=null;}
   if(pelotonOn){buildPeloton();map.addLayer(pelotonGroup);}
