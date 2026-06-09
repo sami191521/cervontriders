@@ -971,7 +971,6 @@ function renderStandings(){
   const J=[];
   if(yellow)J.push(`<div class="jcard" style="--jc:#f4c430"><div class="lab">🟡 Yellow · GC Leader</div><div class="who">${yellow.n}</div><div class="stat">${yellow.ld} sales</div></div>`);
   if(green)J.push(`<div class="jcard" style="--jc:#2a9d8f"><div class="lab">🟢 Green · Sprint pace</div><div class="who">${green.n}</div><div class="stat">${green.r.toFixed(2)} sales/day</div></div>`);
-  if(polka)J.push(`<div class="jcard" style="--jc:#ce1126"><div class="lab">🔴 Polka · King of Hustle</div><div class="who">${polka.n}</div><div class="stat">${polka.pp.toFixed(0)}% productive</div></div>`);
   if(white)J.push(`<div class="jcard" style="--jc:#ffffff"><div class="lab">⚪ White · Top Rookie</div><div class="who">${white.n}</div><div class="stat">${white.ld} sales</div></div>`);
   if(sprintWinner&&sprintWinner.dSales>0)J.push(`<div class="jcard" style="--jc:#7fe05f"><div class="lab">⚡ Today's Sprint</div><div class="who">${sprintWinner.n}</div><div class="stat">+${sprintWinner.dSales} since last update</div></div>`);
   if(breakaway&&breakaway.dRank>0)J.push(`<div class="jcard" style="--jc:#ff9e00"><div class="lab">🚀 Breakaway of the Day</div><div class="who">${breakaway.n}</div><div class="stat">▲${breakaway.dRank} places</div></div>`);
